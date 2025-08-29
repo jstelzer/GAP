@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import asyncio, json, websockets, time
 
 async def run():
