@@ -17,3 +17,30 @@ By submitting a contribution, you agree your code is licensed under Apache-2.0 a
 ```bash
    git checkout -b feat/your-thing
 ```
+
+2.	Build & run locally
+```
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo run
+```
+
+
+3.	Open a PR
+- Keep changes focused and small when possible.
+- Link any related Issues.
+- Include a brief rationale and screenshots/GIFs for user-visible changes.
+
+### Coding guidelines
+- Rust: stable toolchain, formatted with cargo fmt, no clippy warnings.
+- Keep modules small and focused (schema, gap, world, etc.).
+- Prefer clear, minimal public APIs over cleverness.
+
+### Commit messages (lightweight)
+
+Use clear prefixes when helpful:
+- feat: new capability
+- fix: bug fix
+- docs: docs/spec only
+- refactor:, chore:, test:
