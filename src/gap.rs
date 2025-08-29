@@ -15,6 +15,7 @@ pub async fn spawn_server(app_state: AppState) -> Result<GapServer> {
   let (tx, _rx) = mpsc::channel::<Intent>(128);
   let shared_state = Arc::new(app_state);
   let listener = TcpListener::bind(("127.0.0.1", 7777)).await?;
+  log::info!("WebSocket server listening on 127.0.0.1:7777");
   let intents = Arc::new(Mutex::new(Vec::<Intent>::new()));
 
   // accept loop
@@ -22,10 +23,12 @@ pub async fn spawn_server(app_state: AppState) -> Result<GapServer> {
   let intents_in = intents.clone();
   let task = tokio::spawn(async move {
     loop {
-      let (stream, _) = listener.accept().await.unwrap();
+      let (stream, addr) = listener.accept().await.unwrap();
+      log::info!("New WebSocket connection from {}", addr);
       let st = st.clone(); let intents_in = intents_in.clone();
       tokio::spawn(async move {
         let mut ws = accept_async(stream).await.unwrap();
+        log::info!("WebSocket handshake completed for {}", addr);
         ws.send(Message::Text(serde_json::to_string(&Msg::Hello{version:"0.2.0".into(), agent:Some("poc".into())}).unwrap())).await.ok();
         // 30 Hz publisher
         let mut next = Instant::now();
@@ -33,7 +36,9 @@ pub async fn spawn_server(app_state: AppState) -> Result<GapServer> {
           tokio::select! {
             Some(msg) = ws.next() => {
               if let Ok(Message::Text(txt)) = msg {
+                log::debug!("Received message: {}", txt);
                 if let Ok(Msg::Intent{ seq, data }) = serde_json::from_str::<Msg>(&txt) {
+                  log::info!("Processing intent: {:?}", data);
                   // naive rate-limit (10/s)
                   intents_in.lock().await.push(data);
                   ws.send(Message::Text(serde_json::to_string(&Msg::Ack{seq, tick: st.tick()}).unwrap())).await.ok();
@@ -45,6 +50,7 @@ pub async fn spawn_server(app_state: AppState) -> Result<GapServer> {
                 next += Duration::from_millis(33);
                 let s = st.snapshot();
                 let msg = Msg::State{ tick: s.0, tick_rate: s.1, data: s.2 };
+                log::debug!("Broadcasting state at tick {}", s.0);
                 ws.send(Message::Text(serde_json::to_string(&msg).unwrap())).await.ok();
               }
             }

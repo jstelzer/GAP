@@ -8,6 +8,8 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+  env_logger::init();
+  log::info!("Starting GAP ECS server...");
   let mut app = App::new();
   app.add_plugins(MinimalPlugins)
      .insert_resource(Tick{ n:0, hz:30 })
@@ -23,8 +25,10 @@ async fn main() -> anyhow::Result<()> {
   
   let world_ptr = WorldPtr(Arc::new(Mutex::new(shared_world)));
   let app_state = AppState(world_ptr.clone(), 30);
+  log::info!("Spawning WebSocket server on ws://127.0.0.1:7777");
   let server = spawn_server(app_state).await?;
   app.insert_resource(server);
+  log::info!("Server spawned successfully, starting game loop");
 
   // run headless game loop
   loop {
