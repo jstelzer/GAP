@@ -8,7 +8,9 @@ This repo explores using a small ECS-powered game world to prototype the **GAP p
 - Run local/AI agents via Python or Rust clients
 
 ---
+## The SPEC
 
+- **GAP** see [GAP.md](GAP.md)
 ## License
 
 - **Code:** Licensed under [Apache-2.0](LICENSE)
@@ -29,3 +31,7 @@ Run the Bevy ECS world:
 
 ```bash
 cargo run
+# new shell
+python scripts/run_agent.py
+```
+
