@@ -12,7 +12,7 @@ use crate::world::{Tick, Ui, PlayerTag, Monster as CMon, Item as CItem, Pos};
 pub struct GapServer { pub tx_intent: mpsc::Sender<Intent>, pub _task: JoinHandle<()> }
 
 pub async fn spawn_server(app_state: AppState) -> Result<GapServer> {
-  let (tx, mut rx) = mpsc::channel::<Intent>(128);
+  let (tx, _rx) = mpsc::channel::<Intent>(128);
   let shared_state = Arc::new(app_state);
   let listener = TcpListener::bind(("127.0.0.1", 7777)).await?;
   let intents = Arc::new(Mutex::new(Vec::<Intent>::new()));
@@ -91,11 +91,12 @@ impl AppState {
   pub fn snapshot(&self) -> (u64,u32,GState) {
     self.with_world(|w| {
       let t = *w.resource::<Tick>();
-      let ui = w.resource::<Ui>().clone();
+      let ui_can_act = w.resource::<Ui>().can_act;
       let mut player = Player{ hp:72, hp_max:100, mana:40, mana_max:90, pos:[48,52], level:1, in_town:true };
       let mut nearby = Nearby{ monsters: vec![], items: vec![], other_players: vec![] };
+      
       // player
-      if let Ok((p,)) = w.query::<(&Pos,)>().filter_with::<PlayerTag>().get_single(w) {
+      for (p, _) in w.query::<(&Pos, &PlayerTag)>().iter(w) {
         player.pos = [p.x, p.y];
       }
       // monsters
@@ -106,7 +107,7 @@ impl AppState {
       for (it,p) in w.query::<(&CItem,&Pos,)>().iter(w) {
         nearby.items.push(Item{ id:it.id, pos:[p.x,p.y] });
       }
-      (t.n, self.1, GState{ player, nearby, ui_state: UiState{ in_menu:false, in_store:false, can_act: ui.can_act } })
+      (t.n, self.1, GState{ player, nearby, ui_state: UiState{ in_menu:false, in_store:false, can_act: ui_can_act } })
     })
   }
   fn with_world<R>(&self, f: impl FnOnce(&mut bevy::ecs::world::World)->R) -> R {
@@ -120,9 +121,8 @@ pub fn apply_intents(
   mut ev_rx: ResMut<GapServer>,
   mut q_player: Query<&mut Pos, With<PlayerTag>>,
 ) {
-  use futures::TryStreamExt;
-  let rx = &mut ev_rx.tx_intent;
+  let _rx = &mut ev_rx.tx_intent;
   // note: Bevy systems are sync; we already coalesced in async task. Here we’d read from an mpsc::Receiver
   // For brevity, we’ll pretend we pulled one intent via a global; in a real app, feed through a local channel hooked via bevy_tasks.
-  let _ = (&mut q_player, &rx); // placeholder to show linkage
+  let _ = (&mut q_player, &ev_rx); // placeholder to show linkage
 }
