@@ -2,15 +2,25 @@
 
 **Game Agent Protocol (GAP) – ECS Proof-of-Concept**
 
-This repo explores using a small ECS-powered game world to prototype the **GAP protocol**:
+This repo holds the **GAP protocol** + a small ECS-powered reference world to
+prototype it against:
 - Publish game state via WebSocket at 30 Hz
 - Accept simple `intent` messages (`move`, `say`, `use_potion`)
 - Run local/AI agents via Python or Rust clients
 
+GAP is a **protocol + runtime**; games attach via **adapters**. The first adapter
+(DevilutionX) is where the architecture earned its scars — this repo is the
+clean-room runtime where it stays honest.
+
+> **New here? Start with [GETTING-STARTED.md](GETTING-STARTED.md)** — what GAP is,
+> how to run the reference world, and the hard-won lessons from the first adapter
+> that correct the original spec assumptions.
+
 ---
 ## The SPEC
 
-- **GAP** see [GAP.md](GAP.md)
+- **GAP** see [GAP.md](GAP.md) — protocol spec (v0.4 draft; sections marked
+  ⚠️ SUPERSEDED are v0.3 assumptions the first adapter overturned).
 ## License
 
 - **Code:** Licensed under [Apache-2.0](LICENSE)

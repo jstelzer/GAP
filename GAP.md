@@ -1,7 +1,13 @@
-# GAP: Game Agent Protocol (v0.3 Draft)
+# GAP: Game Agent Protocol (v0.4 Draft)
 
 **A lightweight protocol for AI agents to play games cooperatively with humans**
 **License:** Spec under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/); reference implementations under [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
+> **New here? Read [GETTING-STARTED.md](GETTING-STARTED.md) first.** It captures
+> what the first real adapter (DevilutionX) taught us — much of which *corrects*
+> the v0.3 assumptions still recorded below. Sections marked **⚠️ SUPERSEDED**
+> are kept as history; the [v0.4 lessons](#-v04-lessons-from-the-first-adapter)
+> section explains what replaced them.
 
 ---
 
@@ -9,7 +15,52 @@
 
 **v0.1**: JSON protocol with monolithic LLM agent
 **v0.2**: DSL protocol with single specialized agent
-**v0.3**: Multi-agent council architecture ← **Current**
+**v0.3**: Multi-agent council architecture
+**v0.4**: Protocol + runtime + **adapters**; first adapter (DevilutionX) shipped as a *true networked player*, not a companion-slot puppet ← **Current**
+
+---
+
+## 📜 v0.4: Lessons from the First Adapter
+
+> The spec from §1 onward is the **v0.3 draft, written from initial DevilutionX
+> *analysis*** — before the adapter was actually built. Building it overturned
+> several of those assumptions. This section is the correction layer; the full
+> rationale for each lesson is in [GETTING-STARTED.md](GETTING-STARTED.md).
+
+**GAP is a protocol + runtime, with games attached via adapters.** Diablo is the
+*reference implementation / wind tunnel*, not the product. The reusable pipeline:
+
+```
+Perception → Normalize → Capabilities → Council → Intent lease → Execution → Tracing → Offline replay
+```
+
+What the first adapter corrected (assumption → reality):
+
+1. **Companion = a controlled slot in the human's client** → **the agent is a
+   first-class second player running its own client, joined over the network.**
+   This dissolves the "entity control routing" blocker (§Implementation Status)
+   entirely — there's no wrong entity to route to. Actions must go through the
+   engine's normal networked-command path, not direct state pokes (lockstep
+   desyncs otherwise). *Don't make the agent special; make it indistinguishable.*
+2. **JSON message protocol** (§4, §8) → **compact line-oriented DSL** (~10× bytes,
+   ~5× tokens). The JSON examples below are superseded by the DSL.
+3. **"Send nearby entities"** → **self-describing perception.** The engine owns
+   metadata (spell menus, item stats, hazards); the perception layer *publishes*
+   it. Never keep a parallel copy of game tables in the agent — that drift is a
+   bug factory.
+4. **Static priority hierarchy** (§2, §"Priority Hierarchy") → keep the tiers, but
+   add **commitment / intent leases**: re-plan on world-change events, not every
+   tick ("the skeleton is the cache-bust"). Survival reflexes sit in a top tier
+   that's never leased and always preempts.
+5. **Multiplayer sync = a future challenge, agent on host only** (§6.2) → it became
+   **the core architecture.** A game's existing networked-player layer is the
+   *least-invasive* integration seam, not a problem to defer.
+6. **Missing entirely from v0.3:** decision **tracing as core infrastructure**
+   (record → replay → offline test/tune; "trace before tune"), and **just-in-time
+   formal modeling** (a small TLA+ spec per coordination feature, grounded in
+   traced pathologies — not an upfront model that rots).
+
+Treat everything below as the historical draft, read through this lens.
 
 ---
 
@@ -39,9 +90,14 @@ T=12345 F=2 ME=34,18,72,33 PLYR=51,54 M=12@38,16,55,1;19@36,17,20,1 L=71@35,19,1
 
 **Status:** ✅ **Commands validated and sent successfully**
 
-### ⚠️ Current Blocker: Entity Control Routing
+### ⚠️ SUPERSEDED — Entity Control Routing (the blocker that dissolved)
 
-**Problem:** Commands execute on wrong player entity
+> **Resolved by a different model, not a fix.** This blocker only existed because
+> the agent was a *controlled slot in the human's client*. In v0.4 the agent runs
+> its own client and joins as a real networked player, so there is no "wrong
+> entity" to route to. Kept as a cautionary tale. See [v0.4 lessons](#-v04-lessons-from-the-first-adapter) #1.
+
+**Problem (v0.3 model):** Commands execute on wrong player entity
 - Agent generates valid commands: `AT 164`, `MV 78 77`
 - Commands sent via socket successfully
 - Game receives commands but routes to main player instead of companion
@@ -368,6 +424,13 @@ Respect game's input processing limits:
 
 ## 4. Message Protocol
 
+> **⚠️ SUPERSEDED transport.** The JSON messages in this section are the v0.2/v0.3
+> wire format. The shipped adapter uses a compact **DSL** (~10× smaller, ~5× fewer
+> tokens) and, where the game has one, the engine's **native multiplayer
+> handshake** instead of a custom `hello` (identity is assigned by the host, not
+> negotiated). Read §4 as the conceptual message *shapes*, not the live encoding.
+> See [v0.4 lessons](#-v04-lessons-from-the-first-adapter) #2.
+
 ### 4.1 Initialization Handshake
 
 ```json
@@ -534,10 +597,18 @@ Respect game's input processing limits:
 
 **Issue:** DevilutionX uses deterministic lockstep with delta compression
 
-**Solution (Future):**
-- Agent runs on host only initially
-- Agent commands treated as host player input
-- Investigate running agents on all clients with seed sync
+> **⚠️ SUPERSEDED — this "future challenge" became the architecture.** Rather than
+> a problem to defer, the multiplayer layer turned out to be the *cleanest*
+> integration seam: the agent runs its own client and joins as a real player, and
+> commands flow through the normal lockstep command path (`NetSendCmd`). The
+> "agent on host only / commands as host input" plan below was the wrong tree.
+> See [v0.4 lessons](#-v04-lessons-from-the-first-adapter) #1 and #5.
+
+**Solution (v0.3 plan — not what shipped):**
+- ~~Agent runs on host only initially~~
+- ~~Agent commands treated as host player input~~
+- Running agents on all clients with seed sync → **this is what shipped** (each
+  agent is its own networked client; localhost keeps lockstep latency negligible).
 
 ### 6.3 Challenge: State Explosion
 
